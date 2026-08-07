@@ -28,12 +28,6 @@ jobs:
             artifact: appscreener_pattern_sync-windows-x86_64.exe
             binary: target/x86_64-pc-windows-msvc/release/appscreener_pattern_sync.exe
 
-          - name: macos-x86_64
-            os: macos-13
-            target: x86_64-apple-darwin
-            artifact: appscreener_pattern_sync-macos-x86_64
-            binary: target/x86_64-apple-darwin/release/appscreener_pattern_sync
-
           - name: macos-aarch64
             os: macos-14
             target: aarch64-apple-darwin
