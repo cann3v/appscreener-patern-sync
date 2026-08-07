@@ -70,6 +70,9 @@ impl PatternSettings {
             "{pattern_label}: severity must be between 0 and 3"
         );
 
+        self.confidence
+            .with_context(|| format!("{pattern_label}: confidence is required"))?;
+
         if let Some(name) = &self.name {
             ensure!(
                 !name.trim().is_empty(),
@@ -305,6 +308,35 @@ patterns: {}
                 .unwrap_err()
                 .to_string()
                 .contains("severity is required")
+        );
+    }
+
+    #[test]
+    fn rejects_missing_confidence() {
+        let yaml = r#"
+version: 1
+
+defaults:
+  type: DATAFLOW
+  severity: 3
+  active: true
+
+patterns: {}
+"#;
+
+        let manifest: Manifest = serde_saphyr::from_str(yaml).unwrap();
+
+        manifest.validate().unwrap();
+
+        let result = manifest.resolve("source", "source.xml");
+
+        assert!(result.is_err());
+
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("confidence is required")
         );
     }
 }

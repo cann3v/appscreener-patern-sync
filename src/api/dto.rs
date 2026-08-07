@@ -69,8 +69,7 @@ pub struct PatternWrite {
 
     pub severity: i32,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub confidence: Option<i32>,
+    pub confidence: i32,
 
     pub name: String,
 

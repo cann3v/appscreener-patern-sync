@@ -121,6 +121,11 @@ fn build_desired_pattern(
         .severity
         .context("internal error: pattern severity was not resolved")?;
 
+    let confidence = local
+        .settings
+        .confidence
+        .context("internal error: pattern confidence was not resolved")?;
+
     /*
      * Неуказанные необязательные параметры:
      *
@@ -135,11 +140,7 @@ fn build_desired_pattern(
 
         rule_id: rule_id.to_owned(),
         severity,
-
-        confidence: local
-            .settings
-            .confidence
-            .or_else(|| current.and_then(|pattern| pattern.confidence)),
+        confidence,
 
         name: local.name.clone(),
         xml: local.xml.clone(),
@@ -195,9 +196,9 @@ fn detect_changes(current: &PatternDto, desired: &PatternWrite) -> Vec<String> {
         ));
     }
 
-    if current.confidence != desired.confidence {
+    if current.confidence != Some(desired.confidence) {
         changes.push(format!(
-            "confidence: {:?} -> {:?}",
+            "confidence: {:?} -> {}",
             current.confidence, desired.confidence
         ));
     }
@@ -236,6 +237,7 @@ mod tests {
                 pattern_type: Some(PatternType::Dataflow),
 
                 severity: Some(3),
+                confidence: Some(1),
                 active: Some(true),
 
                 ..PatternSettings::default()
@@ -249,7 +251,7 @@ mod tests {
             rule_id: Some("rule-id".to_owned()),
 
             severity: Some(3),
-            confidence: None,
+            confidence: Some(1),
 
             name: name.to_owned(),
             xml: xml.to_owned(),

@@ -80,8 +80,6 @@ pub fn execute_sync_plan(
 
         finalized.user = created.user.clone();
 
-        finalized.confidence = finalized.confidence.or(created.confidence);
-
         finalized.query_type = finalized.query_type.or(created.query_type);
 
         finalized.file_regex = finalized.file_regex.or_else(|| created.file_regex.clone());
@@ -90,7 +88,7 @@ pub fn execute_sync_plan(
             pattern_name = %finalized.name,
             pattern_uuid = %created_uuid,
             severity = finalized.severity,
-            confidence = ?finalized.confidence,
+            confidence = finalized.confidence,
             shared = ?finalized.shared,
             "saving newly created pattern"
         );
