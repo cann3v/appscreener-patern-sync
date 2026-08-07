@@ -1,5 +1,9 @@
+mod api;
 mod app;
 mod cli;
+mod config;
+mod error;
+mod local;
 mod logging;
 
 use std::process::ExitCode;
