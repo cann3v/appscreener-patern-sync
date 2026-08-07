@@ -19,13 +19,19 @@ fn main() -> ExitCode {
 
     if let Err(error) = logging::init(cli.verbose, cli.quiet) {
         eprintln!("failed to initialize logging: {error:#}");
+
         return ExitCode::FAILURE;
     }
 
     match app::run(cli) {
         Ok(()) => ExitCode::SUCCESS,
+
         Err(error) => {
-            error!(error = %format!("{error:#}"), "command failed");
+            error!(
+                error = %format!("{error:#}"),
+                "command failed"
+            );
+
             ExitCode::FAILURE
         }
     }

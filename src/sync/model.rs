@@ -7,7 +7,6 @@ pub enum PlannedOperation {
     },
 
     Update {
-        before: PatternDto,
         desired: PatternWrite,
         changes: Vec<String>,
     },
@@ -78,10 +77,6 @@ pub struct SyncPlan {
 impl SyncPlan {
     pub fn new(operations: Vec<PlannedOperation>) -> Self {
         Self { operations }
-    }
-
-    pub fn operations(&self) -> &[PlannedOperation] {
-        &self.operations
     }
 
     pub fn counts(&self) -> PlanCounts {

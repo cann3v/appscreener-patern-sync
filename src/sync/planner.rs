@@ -46,11 +46,7 @@ pub fn build_sync_plan(
                         name: local.name.clone(),
                     });
                 } else {
-                    operations.push(PlannedOperation::Update {
-                        before: current.clone(),
-                        desired,
-                        changes,
-                    });
+                    operations.push(PlannedOperation::Update { desired, changes });
                 }
             }
         }
@@ -62,8 +58,7 @@ pub fn build_sync_plan(
         .cloned()
         .collect();
 
-    extra_server_patterns
-        .sort_by(|left, right| normalized_name(&left.name).cmp(&normalized_name(&right.name)));
+    extra_server_patterns.sort_by_key(|pattern| normalized_name(&pattern.name));
 
     for current in extra_server_patterns {
         operations.push(PlannedOperation::Delete { current });
@@ -91,9 +86,7 @@ fn validate_server_patterns(server_patterns: &[PatternDto]) -> Result<()> {
     Ok(())
 }
 
-fn index_server_patterns<'a>(
-    server_patterns: &'a [PatternDto],
-) -> Result<HashMap<String, &'a PatternDto>> {
+fn index_server_patterns(server_patterns: &[PatternDto]) -> Result<HashMap<String, &PatternDto>> {
     let mut result = HashMap::new();
 
     for pattern in server_patterns {
@@ -231,19 +224,11 @@ mod tests {
 
     use crate::api::PatternType;
     use crate::config::PatternSettings;
-    use std::path::PathBuf;
 
     fn local_pattern(name: &str, xml: &str) -> LocalPattern {
         LocalPattern {
-            source_path: PathBuf::from(format!("{name}.xml")),
-
-            file_name: format!("{name}.xml"),
-
             name: name.to_owned(),
-
             xml: xml.to_owned(),
-
-            xml_hash: xml_sha256(xml),
 
             settings: PatternSettings {
                 pattern_type: Some(PatternType::Dataflow),

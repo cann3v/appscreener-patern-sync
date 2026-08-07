@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result, ensure};
 use tracing::{debug, info};
@@ -10,11 +10,8 @@ use crate::local::xml::{normalize_xml, validate_xml_fragment, xml_sha256};
 
 #[derive(Clone, Debug)]
 pub struct LocalPattern {
-    pub source_path: PathBuf,
-    pub file_name: String,
     pub name: String,
     pub xml: String,
-    pub xml_hash: String,
     pub settings: PatternSettings,
 }
 
@@ -111,11 +108,8 @@ pub fn load_local_patterns(directory: &Path, manifest: &Manifest) -> Result<Vec<
         );
 
         result.push(LocalPattern {
-            source_path: path,
-            file_name,
             name,
             xml,
-            xml_hash,
             settings: resolved.settings,
         });
     }
