@@ -116,6 +116,11 @@ fn build_desired_pattern(
         .pattern_type
         .context("internal error: pattern type was not resolved")?;
 
+    let severity = local
+        .settings
+        .severity
+        .context("internal error: pattern severity was not resolved")?;
+
     /*
      * Неуказанные необязательные параметры:
      *
@@ -129,11 +134,7 @@ fn build_desired_pattern(
         uuid: current.and_then(|pattern| pattern.uuid.clone()),
 
         rule_id: rule_id.to_owned(),
-
-        severity: local
-            .settings
-            .severity
-            .or_else(|| current.and_then(|pattern| pattern.severity)),
+        severity,
 
         confidence: local
             .settings
@@ -141,12 +142,13 @@ fn build_desired_pattern(
             .or_else(|| current.and_then(|pattern| pattern.confidence)),
 
         name: local.name.clone(),
-
         xml: local.xml.clone(),
-
         pattern_type,
-
         active: local.settings.active.unwrap_or(true),
+
+        shared: current.and_then(|pattern| pattern.shared),
+
+        user: current.and_then(|pattern| pattern.user.clone()),
 
         query_type: local
             .settings
@@ -186,7 +188,7 @@ fn detect_changes(current: &PatternDto, desired: &PatternWrite) -> Vec<String> {
         ));
     }
 
-    if current.severity != desired.severity {
+    if current.severity != Some(desired.severity) {
         changes.push(format!(
             "severity: {:?} -> {:?}",
             current.severity, desired.severity
@@ -233,6 +235,7 @@ mod tests {
             settings: PatternSettings {
                 pattern_type: Some(PatternType::Dataflow),
 
+                severity: Some(3),
                 active: Some(true),
 
                 ..PatternSettings::default()
@@ -244,16 +247,18 @@ mod tests {
         PatternDto {
             uuid: Some(uuid.to_owned()),
             rule_id: Some("rule-id".to_owned()),
-            severity: None,
+
+            severity: Some(3),
             confidence: None,
+
             name: name.to_owned(),
             xml: xml.to_owned(),
 
             pattern_type: Some(PatternType::Dataflow),
 
             active: Some(true),
-            shared: None,
-            user: None,
+            shared: Some(false),
+            user: Some("test-user".to_owned()),
             query_type: None,
             file_regex: None,
         }

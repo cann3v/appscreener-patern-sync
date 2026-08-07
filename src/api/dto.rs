@@ -67,8 +67,7 @@ pub struct PatternWrite {
 
     pub rule_id: String,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub severity: Option<i32>,
+    pub severity: i32,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub confidence: Option<i32>,
@@ -81,6 +80,12 @@ pub struct PatternWrite {
     pub pattern_type: PatternType,
 
     pub active: bool,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shared: Option<bool>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub query_type: Option<QueryType>,

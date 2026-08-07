@@ -1,4 +1,4 @@
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use tracing::{info, warn};
 
 use crate::api::ApiClient;
@@ -57,10 +57,50 @@ pub fn execute_sync_plan(
 
         let created = api.create_pattern(desired)?;
 
+        let created_uuid = created
+            .uuid
+            .clone()
+            .context("appScreener created a pattern but returned no UUID")?;
+
         info!(
             pattern_name = %created.name,
-            pattern_uuid = ?created.uuid,
+            pattern_uuid = %created_uuid,
             "pattern created"
+        );
+
+        let mut finalized = desired.clone();
+
+        finalized.uuid = Some(created_uuid.clone());
+
+        /*
+         * Сохраняем серверные поля из ответа POST,
+         * чтобы последующий PUT соответствовал запросу UI.
+         */
+        finalized.shared = created.shared;
+
+        finalized.user = created.user.clone();
+
+        finalized.confidence = finalized.confidence.or(created.confidence);
+
+        finalized.query_type = finalized.query_type.or(created.query_type);
+
+        finalized.file_regex = finalized.file_regex.or_else(|| created.file_regex.clone());
+
+        info!(
+            pattern_name = %finalized.name,
+            pattern_uuid = %created_uuid,
+            severity = finalized.severity,
+            confidence = ?finalized.confidence,
+            shared = ?finalized.shared,
+            "saving newly created pattern"
+        );
+
+        api.update_pattern(&finalized)?;
+
+        info!(
+            pattern_name = %finalized.name,
+            pattern_uuid = %created_uuid,
+            "new pattern saved"
         );
     }
 

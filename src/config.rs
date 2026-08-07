@@ -61,12 +61,14 @@ impl PatternSettings {
              in defaults or in the pattern entry"
         );
 
-        if let Some(severity) = self.severity {
-            ensure!(
-                (0..=3).contains(&severity),
-                "{pattern_label}: severity must be between 0 and 3"
-            );
-        }
+        let severity = self
+            .severity
+            .with_context(|| format!("{pattern_label}: severity is required"))?;
+
+        ensure!(
+            (0..=3).contains(&severity),
+            "{pattern_label}: severity must be between 0 and 3"
+        );
 
         if let Some(name) = &self.name {
             ensure!(
@@ -98,6 +100,7 @@ pub struct Manifest {
     pub patterns: BTreeMap<String, PatternSettings>,
 }
 
+#[derive(Debug)]
 pub struct ResolvedSettings {
     pub settings: PatternSettings,
 
@@ -176,6 +179,11 @@ impl Manifest {
              pattern would receive the same name"
         );
 
+        /*
+         * Severity необязательна именно в defaults,
+         * потому что её можно задать индивидуально каждому паттерну.
+         * После объединения defaults + override она становится обязательной.
+         */
         if let Some(severity) = self.defaults.severity {
             ensure!(
                 (0..=3).contains(&severity),
@@ -270,5 +278,33 @@ defaults:
         let manifest: Manifest = serde_saphyr::from_str(yaml).unwrap();
 
         assert!(manifest.validate().is_err());
+    }
+
+    #[test]
+    fn rejects_missing_severity() {
+        let yaml = r#"
+version: 1
+
+defaults:
+  type: DATAFLOW
+  active: true
+
+patterns: {}
+"#;
+
+        let manifest: Manifest = serde_saphyr::from_str(yaml).unwrap();
+
+        manifest.validate().unwrap();
+
+        let result = manifest.resolve("source", "source.xml");
+
+        assert!(result.is_err());
+
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("severity is required")
+        );
     }
 }
