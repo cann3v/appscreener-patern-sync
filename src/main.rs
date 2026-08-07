@@ -5,6 +5,7 @@ mod config;
 mod error;
 mod local;
 mod logging;
+mod sync;
 
 use std::process::ExitCode;
 
