@@ -8,9 +8,10 @@ use serde::Serialize;
 use tracing::{info, warn};
 
 use crate::api::{ApiClient, PatternDto};
-use crate::cli::{ApplyArgs, Cli, Command, SyncArgs};
+use crate::cli::{ApplyArgs, Cli, Command, InitRuleArgs, SyncArgs};
 use crate::config::Manifest;
 use crate::local::{LocalPattern, load_local_patterns};
+use crate::scaffold::{RuleScaffoldSpec, create_rule_scaffold};
 use crate::sync::{SyncPlan, build_sync_plan, execute_sync_plan};
 
 struct PreparedSync {
@@ -34,6 +35,8 @@ pub fn run(cli: Cli) -> Result<()> {
         Command::Plan(args) => run_plan(args),
 
         Command::Apply(args) => run_apply(args),
+
+        Command::InitRule(args) => run_init_rule(args),
     }
 }
 
@@ -183,6 +186,43 @@ fn write_snapshot(path: &Path, rule_id: &str, patterns: &[PatternDto]) -> Result
         patterns = patterns.len(),
         "server snapshot written"
     );
+
+    Ok(())
+}
+
+fn run_init_rule(args: InitRuleArgs) -> Result<()> {
+    let spec = RuleScaffoldSpec {
+        rules_root: args.rules_root,
+        dir_name: args.dir_name,
+        title: args.title,
+        cwe: args.cwe,
+        pattern_type: args.pattern_type,
+        severity: args.severity,
+        confidence: args.confidence,
+    };
+
+    info!(
+        rules_root = %spec.rules_root.display(),
+        dir_name = %spec.dir_name,
+        cwe = ?spec.cwe,
+        pattern_type = %spec.pattern_type,
+        severity = spec.severity,
+        confidence = spec.confidence,
+        "creating rule scaffold"
+    );
+
+    let result = create_rule_scaffold(&spec)?;
+
+    println!();
+    println!("Created rule scaffold:");
+    println!();
+    println!("{}", result.target.display());
+    println!();
+    println!("Files:");
+
+    for file in result.relative_files() {
+        println!("  {}", file.display());
+    }
 
     Ok(())
 }

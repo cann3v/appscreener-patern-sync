@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use clap::{ArgAction, Args, Parser, Subcommand};
 use uuid::Uuid;
 
+use crate::scaffold::ScaffoldPatternType;
+
 #[derive(Debug, Parser)]
 #[command(
     name = "appscreener-pattern-sync",
@@ -35,6 +37,9 @@ pub enum Command {
 
     /// Synchronize the rule with the local directory.
     Apply(ApplyArgs),
+
+    /// Create a directory structure for a new appScreener rule.
+    InitRule(InitRuleArgs),
 }
 
 #[derive(Debug, Clone, Args)]
@@ -100,4 +105,46 @@ pub struct ApplyArgs {
     /// contains no XML files.
     #[arg(long)]
     pub allow_empty: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct InitRuleArgs {
+    /// Parent directory where the new rule directory will be created.
+    #[arg(long)]
+    pub rules_root: PathBuf,
+
+    /// Name of the new rule directory.
+    #[arg(long)]
+    pub dir_name: String,
+
+    /// Human-readable rule title.
+    ///
+    /// Defaults to the directory name.
+    #[arg(long)]
+    pub title: Option<String>,
+
+    /// Optional CWE number.
+    #[arg(long)]
+    pub cwe: Option<u32>,
+
+    /// Default appScreener pattern type.
+    #[arg(
+        long,
+        value_enum,
+        ignore_case = true,
+        default_value_t = ScaffoldPatternType::Reporting
+    )]
+    pub pattern_type: ScaffoldPatternType,
+
+    /// Default pattern severity.
+    #[arg(
+        long,
+        default_value_t = 3,
+        value_parser = clap::value_parser!(i32).range(0..=3)
+    )]
+    pub severity: i32,
+
+    /// Default pattern confidence.
+    #[arg(long, default_value_t = 1)]
+    pub confidence: i32,
 }
