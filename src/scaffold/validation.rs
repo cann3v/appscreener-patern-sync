@@ -150,3 +150,146 @@ fn is_reserved_windows_name(name: &str) -> bool {
             | "LPT9"
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+
+    use super::validate_spec;
+    use crate::scaffold::model::{RuleScaffoldSpec, ScaffoldPatternType};
+    use crate::scaffold::test_support::TestDirectory;
+
+    fn test_spec(rules_root: &Path) -> RuleScaffoldSpec {
+        RuleScaffoldSpec {
+            rules_root: rules_root.to_path_buf(),
+            dir_name: "custom-memory-rule".to_owned(),
+            title: None,
+            cwe: None,
+            pattern_type: ScaffoldPatternType::Reporting,
+            severity: 3,
+            confidence: 1,
+        }
+    }
+
+    #[test]
+    fn accepts_arbitrary_directory_name_without_cwe() {
+        let rules_root = TestDirectory::new("valid-spec");
+        let spec = test_spec(rules_root.path());
+
+        let target = validate_spec(&spec).unwrap();
+
+        assert_eq!(target, rules_root.path().join("custom-memory-rule"));
+    }
+
+    #[test]
+    fn rejects_missing_or_non_directory_rules_root() {
+        let temporary = TestDirectory::new("invalid-root");
+
+        let missing_root = temporary.path().join("missing");
+        let missing_spec = test_spec(&missing_root);
+
+        let error = validate_spec(&missing_spec).unwrap_err();
+
+        assert!(
+            error.to_string().contains("rules root does not exist"),
+            "unexpected error: {error:#}"
+        );
+
+        let file_root = temporary.path().join("rules.txt");
+        fs::write(&file_root, "not a directory").unwrap();
+
+        let file_spec = test_spec(&file_root);
+        let error = validate_spec(&file_spec).unwrap_err();
+
+        assert!(
+            error.to_string().contains("rules root is not a directory"),
+            "unexpected error: {error:#}"
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_directory_names() {
+        let rules_root = TestDirectory::new("invalid-names");
+
+        let invalid_names = [
+            "",
+            " leading-space",
+            "trailing-space ",
+            "trailing-dot.",
+            "nested/directory",
+            r"nested\directory",
+            "invalid:name",
+            "invalid*name",
+            "CON",
+            "con.txt",
+            "NUL",
+            "COM1",
+            "lpt9.log",
+            ".",
+            "..",
+        ];
+
+        for name in invalid_names {
+            let mut spec = test_spec(rules_root.path());
+            spec.dir_name = name.to_owned();
+
+            assert!(
+                validate_spec(&spec).is_err(),
+                "directory name `{name}` should be rejected"
+            );
+        }
+
+        let mut spec = test_spec(rules_root.path());
+        spec.dir_name = "a".repeat(256);
+
+        assert!(
+            validate_spec(&spec).is_err(),
+            "a directory name longer than 255 UTF-16 code units should be rejected"
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_metadata_values() {
+        let rules_root = TestDirectory::new("invalid-metadata");
+
+        let mut spec = test_spec(rules_root.path());
+        spec.title = Some("   ".to_owned());
+        assert!(validate_spec(&spec).is_err());
+
+        let mut spec = test_spec(rules_root.path());
+        spec.title = Some("invalid\ntitle".to_owned());
+        assert!(validate_spec(&spec).is_err());
+
+        let mut spec = test_spec(rules_root.path());
+        spec.cwe = Some(0);
+        assert!(validate_spec(&spec).is_err());
+
+        for severity in [-1, 4] {
+            let mut spec = test_spec(rules_root.path());
+            spec.severity = severity;
+
+            assert!(
+                validate_spec(&spec).is_err(),
+                "severity {severity} should be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_existing_target_directory() {
+        let rules_root = TestDirectory::new("existing-target");
+        let spec = test_spec(rules_root.path());
+
+        fs::create_dir(spec.target_path()).unwrap();
+
+        let error = validate_spec(&spec).unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("target directory already exists"),
+            "unexpected error: {error:#}"
+        );
+    }
+}

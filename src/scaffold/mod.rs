@@ -3,6 +3,9 @@ mod templates;
 mod validation;
 mod writer;
 
+#[cfg(test)]
+mod test_support;
+
 pub use model::{RuleScaffoldSpec, ScaffoldPatternType, ScaffoldResult};
 
 use anyhow::Result;

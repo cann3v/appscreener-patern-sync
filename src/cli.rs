@@ -148,3 +148,91 @@ pub struct InitRuleArgs {
     #[arg(long, default_value_t = 1)]
     pub confidence: i32,
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::PathBuf;
+
+    use clap::Parser;
+
+    use super::{Cli, Command};
+    use crate::scaffold::ScaffoldPatternType;
+
+    #[test]
+    fn parses_minimal_init_rule_command() {
+        let cli = Cli::try_parse_from([
+            "appscreener-pattern-sync",
+            "init-rule",
+            "--rules-root",
+            "rules",
+            "--dir-name",
+            "custom-memory-rule",
+        ])
+        .unwrap();
+
+        let Command::InitRule(args) = cli.command else {
+            panic!("expected init-rule command");
+        };
+
+        assert_eq!(args.rules_root, PathBuf::from("rules"));
+        assert_eq!(args.dir_name, "custom-memory-rule");
+        assert_eq!(args.title, None);
+        assert_eq!(args.cwe, None);
+        assert!(matches!(args.pattern_type, ScaffoldPatternType::Reporting));
+        assert_eq!(args.severity, 3);
+        assert_eq!(args.confidence, 1);
+    }
+
+    #[test]
+    fn parses_complete_init_rule_command() {
+        let cli = Cli::try_parse_from([
+            "appscreener-pattern-sync",
+            "init-rule",
+            "--rules-root",
+            "rules",
+            "--dir-name",
+            "cwe244",
+            "--title",
+            "Improper Clearing of Heap Memory",
+            "--cwe",
+            "244",
+            "--pattern-type",
+            "dataflow",
+            "--severity",
+            "2",
+            "--confidence",
+            "3",
+        ])
+        .unwrap();
+
+        let Command::InitRule(args) = cli.command else {
+            panic!("expected init-rule command");
+        };
+
+        assert_eq!(args.dir_name, "cwe244");
+        assert_eq!(
+            args.title.as_deref(),
+            Some("Improper Clearing of Heap Memory")
+        );
+        assert_eq!(args.cwe, Some(244));
+        assert!(matches!(args.pattern_type, ScaffoldPatternType::Dataflow));
+        assert_eq!(args.severity, 2);
+        assert_eq!(args.confidence, 3);
+    }
+
+    #[test]
+    fn rejects_invalid_cli_severity() {
+        let result = Cli::try_parse_from([
+            "appscreener-pattern-sync",
+            "init-rule",
+            "--rules-root",
+            "rules",
+            "--dir-name",
+            "custom-rule",
+            "--severity",
+            "4",
+        ]);
+
+        assert!(result.is_err());
+    }
+}

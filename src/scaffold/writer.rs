@@ -177,3 +177,205 @@ impl Drop for StagingDirectory {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::{Path, PathBuf};
+
+    use crate::scaffold::model::{RuleScaffoldSpec, ScaffoldPatternType};
+    use crate::scaffold::templates;
+    use crate::scaffold::test_support::TestDirectory;
+    use crate::scaffold::{create_rule_scaffold, validation};
+
+    fn test_spec(rules_root: &Path) -> RuleScaffoldSpec {
+        RuleScaffoldSpec {
+            rules_root: rules_root.to_path_buf(),
+            dir_name: "custom-rule".to_owned(),
+            title: Some("Custom Rule".to_owned()),
+            cwe: Some(273),
+            pattern_type: ScaffoldPatternType::Dataflow,
+            severity: 3,
+            confidence: 1,
+        }
+    }
+
+    #[test]
+    fn creates_complete_rule_scaffold() {
+        let rules_root = TestDirectory::new("writer-success");
+        let spec = test_spec(rules_root.path());
+
+        let result = create_rule_scaffold(&spec).unwrap();
+        let target = rules_root.path().join("custom-rule");
+
+        assert_eq!(result.target, target);
+        assert!(target.is_dir());
+
+        for directory in [
+            "docs",
+            "rule",
+            "rule/patterns",
+            "tests",
+            "tests/include",
+            "tests/src",
+        ] {
+            assert!(
+                target.join(directory).is_dir(),
+                "missing generated directory: {directory}"
+            );
+        }
+
+        let expected_files = [
+            "README.md",
+            "docs/pattern-catalog.md",
+            "rule/rule-metadata.md",
+            "rule/patterns/patterns.yaml",
+            "tests/build.sh",
+            "tests/include/.gitkeep",
+            "tests/src/.gitkeep",
+        ];
+
+        for relative_path in &expected_files {
+            assert!(
+                target.join(relative_path).is_file(),
+                "missing generated file: {relative_path}"
+            );
+        }
+
+        let actual_files: Vec<PathBuf> = result.relative_files().map(Path::to_path_buf).collect();
+
+        let expected_paths: Vec<PathBuf> = expected_files.iter().map(PathBuf::from).collect();
+
+        assert_eq!(actual_files, expected_paths);
+
+        assert_eq!(
+            fs::read_to_string(target.join("README.md")).unwrap(),
+            templates::readme(&spec)
+        );
+
+        assert_eq!(
+            fs::read_to_string(target.join("docs/pattern-catalog.md")).unwrap(),
+            templates::pattern_catalog(&spec)
+        );
+
+        assert_eq!(
+            fs::read_to_string(target.join("rule/rule-metadata.md")).unwrap(),
+            templates::rule_metadata(&spec)
+        );
+
+        assert_eq!(
+            fs::read_to_string(target.join("rule/patterns/patterns.yaml")).unwrap(),
+            templates::patterns_manifest(&spec)
+        );
+
+        assert_eq!(
+            fs::read_to_string(target.join("tests/build.sh")).unwrap(),
+            templates::build_script()
+        );
+
+        assert_eq!(
+            fs::metadata(target.join("tests/include/.gitkeep"))
+                .unwrap()
+                .len(),
+            0
+        );
+
+        assert_eq!(
+            fs::metadata(target.join("tests/src/.gitkeep"))
+                .unwrap()
+                .len(),
+            0
+        );
+
+        let temporary_prefix = ".custom-rule.tmp-";
+
+        let temporary_directories: Vec<_> = fs::read_dir(rules_root.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .filter(|name| name.to_string_lossy().starts_with(temporary_prefix))
+            .collect();
+
+        assert!(
+            temporary_directories.is_empty(),
+            "temporary directories were not removed: {temporary_directories:?}"
+        );
+    }
+
+    #[test]
+    fn does_not_overwrite_existing_target() {
+        let rules_root = TestDirectory::new("writer-existing");
+        let spec = test_spec(rules_root.path());
+        let target = spec.target_path();
+
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("sentinel.txt"), "keep me").unwrap();
+
+        let error = create_rule_scaffold(&spec).unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("target directory already exists"),
+            "unexpected error: {error:#}"
+        );
+
+        assert_eq!(
+            fs::read_to_string(target.join("sentinel.txt")).unwrap(),
+            "keep me"
+        );
+    }
+
+    #[test]
+    fn rejects_target_created_after_validation() {
+        let rules_root = TestDirectory::new("writer-race");
+        let spec = test_spec(rules_root.path());
+
+        let target = validation::validate_spec(&spec).unwrap();
+
+        fs::create_dir(&target).unwrap();
+        fs::write(target.join("sentinel.txt"), "keep me").unwrap();
+
+        let error = super::write_scaffold(&spec, target.clone()).unwrap_err();
+
+        assert!(
+            error
+                .to_string()
+                .contains("target directory appeared during generation"),
+            "unexpected error: {error:#}"
+        );
+
+        assert_eq!(
+            fs::read_to_string(target.join("sentinel.txt")).unwrap(),
+            "keep me"
+        );
+
+        let temporary_directories: Vec<_> = fs::read_dir(rules_root.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .filter(|name| name.to_string_lossy().starts_with(".custom-rule.tmp-"))
+            .collect();
+
+        assert!(
+            temporary_directories.is_empty(),
+            "staging directory was not cleaned up: {temporary_directories:?}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn makes_build_script_executable_on_unix() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let rules_root = TestDirectory::new("writer-permissions");
+        let spec = test_spec(rules_root.path());
+
+        let result = create_rule_scaffold(&spec).unwrap();
+
+        let mode = fs::metadata(result.target.join("tests/build.sh"))
+            .unwrap()
+            .permissions()
+            .mode();
+
+        assert_eq!(mode & 0o111, 0o111);
+    }
+}
