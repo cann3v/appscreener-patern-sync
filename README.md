@@ -2,9 +2,11 @@
 
 A Rust CLI utility that synchronizes local XML patterns with an existing Solar appScreener custom rule.
 
-The local directory is treated as the source of truth. After a successful run, the rule contains exactly the same set of patterns as the specified local directory.
+The local directory is treated as the source of truth. After a successful run, the rule contains exactly the same set 
+of patterns as the specified local directory.
 
-The utility does not create rules or modify rule metadata. It never calls `PUT /rules/custom`.
+The `plan` and `apply` commands do not create rules or modify rule metadata in appScreener. The `init-rule` command 
+only creates a local authoring scaffold and does not contact the appScreener API.
 
 ## Features
 
@@ -19,7 +21,8 @@ The utility does not create rules or modify rule metadata. It never calls `PUT /
 - verification before and after deletion;
 - structured logging with `tracing`;
 - JWT authentication through an environment variable;
-- protection against accidentally removing every pattern.
+- protection against accidentally removing every pattern;
+- local rule project scaffolding with `init-rule`.
 
 ## Requirements
 
@@ -48,6 +51,93 @@ cargo check
 cargo test
 cargo clippy --all-targets --all-features -- -D warnings
 ```
+
+## Create a rule project
+
+The `init-rule` command creates a local directory structure for developing a new appScreener rule. It does not require 
+a JWT, does not access the network, and does not create a rule in appScreener.
+
+### Minimal example
+
+```powershell
+target\release\appscreener-pattern-sync.exe init-rule `
+  --rules-root C:\path\to\rules `
+  --dir-name custom-memory-rule
+```
+
+The following defaults are used:
+
+```text
+title:        <directory name>
+CWE:          not specified
+pattern type: REPORTING
+severity:     3
+confidence:   1
+```
+
+### Full example
+
+```powershell
+target\release\appscreener-pattern-sync.exe init-rule `
+  --rules-root C:\path\to\rules `
+  --dir-name cwe244 `
+  --title "Improper Clearing of Heap Memory Before Release" `
+  --cwe 244 `
+  --pattern-type DATAFLOW `
+  --severity 3 `
+  --confidence 1
+```
+
+The pattern type is case-insensitive and accepts:
+
+```text
+REPORTING
+DATAFLOW
+```
+
+### Generated structure
+
+```text
+cwe244/
+├── docs/
+│   └── pattern-catalog.md
+├── rule/
+│   ├── rule-metadata.md
+│   └── patterns/
+│       └── patterns.yaml
+├── tests/
+│   ├── build.sh
+│   ├── include/
+│   │   └── .gitkeep
+│   └── src/
+│       └── .gitkeep
+└── README.md
+```
+
+The generated `patterns.yaml` contains the selected pattern type, severity, confidence, and the default active state:
+
+```yaml
+version: 1
+
+defaults:
+  type: DATAFLOW
+  severity: 3
+  confidence: 1
+  active: true
+
+patterns: {}
+```
+
+The directory name does not have to follow the `cwe<number>` format. Any valid single directory name can be used.
+
+The command:
+
+- requires the rules root directory to already exist;
+- refuses to overwrite an existing target directory;
+- rejects path traversal and Windows-reserved names;
+- generates the scaffold in a temporary directory;
+- moves the completed scaffold to its final location atomically;
+- creates `.gitkeep` files in otherwise empty directories.
 
 ## Local directory structure
 
@@ -103,7 +193,8 @@ patterns: {}
 
 These settings are applied to every XML file in the directory.
 
-`severity` and `confidence` are mandatory. In the tested appScreener version, a pattern without these values may be stored in the database but will not participate in an analysis.
+`severity` and `confidence` are mandatory. In the tested appScreener version, a pattern without these values may be 
+stored in the database but will not participate in an analysis.
 
 ### Full configuration
 
@@ -189,7 +280,8 @@ The appScreener DataFlow DSL may contain multiple top-level sections:
 
 Such content is not a conventional XML document with one root element.
 
-For validation, the utility temporarily wraps the content in a synthetic root element. The original fragment is sent to appScreener without this synthetic root.
+For validation, the utility temporarily wraps the content in a synthetic root element. The original fragment is sent to 
+appScreener without this synthetic root.
 
 The following inputs are rejected:
 
@@ -248,7 +340,8 @@ Actions have the following meanings:
 
 Pattern names are matched case-insensitively.
 
-If the server contains several patterns with names that differ only by letter case, the operation fails because the match would be ambiguous.
+If the server contains several patterns with names that differ only by letter case, the operation fails because the 
+match would be ambiguous.
 
 ## Apply mode
 
@@ -275,7 +368,8 @@ Changes are applied in the following safe order:
 5. delete server patterns missing from the local directory;
 6. verify the final state.
 
-A newly created pattern is explicitly finalized with `PUT` because appScreener uses this request to register the pattern with the analysis engine.
+A newly created pattern is explicitly finalized with `PUT` because appScreener uses this request to register the 
+pattern with the analysis engine.
 
 If a `POST` or finalizing `PUT` fails, obsolete server patterns have not yet been deleted.
 
@@ -319,11 +413,13 @@ Example:
 }
 ```
 
-An automatic restore command has not yet been implemented. A deleted pattern can be recreated from the snapshot, but it may receive a new UUID.
+An automatic restore command has not yet been implemented. A deleted pattern can be recreated from the snapshot, but it 
+may receive a new UUID.
 
 ## Empty-directory protection
 
-By default, the utility refuses to remove the complete server pattern set when the local directory contains no XML files:
+By default, the utility refuses to remove the complete server pattern set when the local directory contains no XML 
+files:
 
 ```text
 local directory contains no XML patterns
@@ -499,7 +595,9 @@ The second request corresponds to clicking **Save** in the appScreener UI.
 - The appScreener API does not provide batch transactions.
 - Automatic rollback is not implemented.
 - Restored patterns may receive different UUIDs.
-- The utility works only with an existing custom rule.
-- Creating rules and changing rule metadata are not supported.
+- The `plan` and `apply` commands work only with an existing custom rule.
+- The `init-rule` command creates only a local project structure; creating the server-side rule through the appScreener 
+API is not supported.
+- Changing server-side rule metadata is not supported.
 - Only local `*.xml` files are supported.
 - The allowed `confidence` range is not defined by OpenAPI and is controlled by configuration.
