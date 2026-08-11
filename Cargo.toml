@@ -1,6 +1,6 @@
 [package]
 name = "appscreener_pattern_sync"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Synchronize local XML patterns with an existing Solar appScreener custom rule"
 
